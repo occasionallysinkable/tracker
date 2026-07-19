@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>The Nightly Tally</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#0E1119;--ink2:#141A27;--card:#1A2131;--line:#2A3346;
+    --text:#E9E7E1;--muted:#8B93A5;--faint:#5C6478;
+    --amber:#EBB04A;--green:#8FBF9F;--dust:#CE8375;--slate:#8FB0CC;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{-webkit-text-size-adjust:100%;}
+  body{background:var(--ink);color:var(--text);font-family:'Inter',system-ui,sans-serif;line-height:1.5;
+    background-image:radial-gradient(120% 55% at 50% -8%, rgba(235,176,74,.07), transparent 60%);
+    background-repeat:no-repeat;min-height:100vh;padding:22px 14px 48px;}
+  .wrap{max-width:460px;margin:0 auto;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .disp{font-family:'Space Grotesk',system-ui,sans-serif;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  input{font-family:inherit;}
+  ::placeholder{color:var(--faint);}
+  .eye{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);}
+  h1{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-size:30px;line-height:1.1;letter-spacing:-.01em;margin-top:10px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;}
+  .block{padding:16px;}
+  .rowb{display:flex;justify-content:space-between;align-items:center;}
+  .tap{transition:transform .06s ease,background .15s,border-color .15s;}
+  .tap:active{transform:scale(.96);}
+  .primary{width:100%;padding:13px;border-radius:11px;background:var(--text);color:var(--ink);font-size:15px;font-weight:600;font-family:'Space Grotesk',sans-serif;}
+  .amberbtn{background:var(--amber);color:var(--ink);}
+  .input{width:100%;background:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;}
+  .num{width:66px;background:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:7px 10px;color:var(--text);font-size:14px;outline:none;font-family:'JetBrains Mono',monospace;}
+  .step{width:34px;height:34px;font-size:18px;color:var(--text);background:var(--ink2);display:flex;align-items:center;justify-content:center;border-radius:8px;}
+  .bar{height:8px;border-radius:5px;background:var(--ink2);border:1px solid var(--line);overflow:hidden;margin-top:10px;}
+  .fill{height:100%;border-radius:5px;}
+  .eyebtn{font-size:12px;color:var(--muted);}
+  .stat{padding:14px;}
+  .big{font-family:'JetBrains Mono',monospace;font-size:30px;font-weight:700;margin-top:6px;}
+  .unit{font-size:12px;color:var(--faint);margin-left:5px;font-weight:500;}
+  .nav{display:flex;gap:10px;margin-top:16px;}
+  .navb{flex:1;padding:12px 8px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:12.5px;font-weight:500;}
+  .export{width:100%;margin-top:16px;padding:12px;border-radius:11px;border:1px solid var(--slate);color:var(--slate);background:rgba(143,176,204,.10);font-size:12.5px;letter-spacing:.04em;font-family:'JetBrains Mono',monospace;}
+  .ghost{width:100%;margin-top:12px;padding:11px;border-radius:11px;border:1px dashed var(--line);color:var(--muted);background:transparent;font-size:13px;font-family:'JetBrains Mono',monospace;}
+  .banner{padding:9px 12px;border-radius:9px;font-size:12.5px;margin-bottom:12px;}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+/* ---------------- config + helpers ---------------- */
+var C = {ink:"#0E1119",ink2:"#141A27",card:"#1A2131",line:"#2A3346",text:"#E9E7E1",muted:"#8B93A5",faint:"#5C6478",amber:"#EBB04A",green:"#8FBF9F",dust:"#CE8375",slate:"#8FB0CC"};
+
+var DEFAULT_ITEMS = [
+  {id:"pray",   label:"Prayed",                       unit:1, type:"count",  max:5},
+  {id:"brush",  label:"Brushed",                      unit:1, type:"count",  max:2},
+  {id:"book",   label:"Chose a book",                 unit:2, type:"binary"},
+  {id:"noporn", label:"No porn",                      unit:1, type:"binary"},
+  {id:"nofap",  label:"No fapping",                   unit:1, type:"binary"},
+  {id:"eat",    label:"Ate mindfully",                unit:1, type:"binary"},
+  {id:"fix",    label:"Fixed / cleaned / maintained", unit:1, type:"count",  max:null},
+  {id:"milk",   label:"Got the milk",                 unit:1, type:"binary"},
+  {id:"job",    label:"Applied to a job",             unit:2, type:"count",  max:null},
+  {id:"network",label:"Networking message",           unit:2, type:"count",  max:null},
+  {id:"extra",  label:"Went the extra mile at work",  unit:1, type:"binary"}
+];
+function defaultConfig(){ return {items:DEFAULT_ITEMS.map(function(x){return Object.assign({},x);}), target:2, rewardThreshold:60, rewardLabel:"", graceUsedDates:[]}; }
+
+function pad(n){ return (n<10?"0":"")+n; }
+function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function daysBetween(a,b){ return Math.round((new Date(b+"T00:00")-new Date(a+"T00:00"))/86400000); }
+function mondayOf(s){ var d=new Date(s+"T00:00"); var k=(d.getDay()+6)%7; d.setDate(d.getDate()-k); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function itemPoints(it,v){ if(it.type==="binary") return v?it.unit:0; return Number(v||0)*it.unit; }
+function scoreDay(items,vals){ var s=0; for(var i=0;i<items.length;i++){ s+=itemPoints(items[i], vals[items[i].id]); } return s; }
+function graceAvailable(g,D){ for(var i=0;i<g.length;i++){ var d=daysBetween(g[i],D); if(d>=0&&d<7) return false; } return true; }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ---------------- state ---------------- */
+var state = { url:null, config:null, days:{}, screen:"home", loading:false, error:"", draftVals:{}, draftNote:"", draftItems:null, saved:false };
+
+/* ---------------- api (talks to the user's own Apps Script) ---------------- */
+function apiGet(){ return fetch(state.url+"?action=load").then(function(r){return r.json();}); }
+function apiPost(payload){ return fetch(state.url,{method:"POST",body:JSON.stringify(payload)}).then(function(r){return r.json();}); }
+
+function load(){
+  state.loading=true; state.error=""; render();
+  apiGet().then(function(res){
+    if(!res||!res.ok) throw new Error(res&&res.error?res.error:"bad response");
+    state.config = res.config || defaultConfig();
+    state.days = res.days || {};
+    state.loading=false;
+    if(!res.config){ apiPost({action:"saveConfig",config:state.config}); }
+    render();
+  }).catch(function(e){
+    state.loading=false; state.error="Couldn't reach your sheet. Check the link in Settings. ("+e.message+")"; render();
+  });
+}
+
+/* ---------------- boot ---------------- */
+function init(){
+  state.url = localStorage.getItem("tally_url") || null;
+  if(!state.url){ state.screen="setup"; render(); }
+  else { load(); }
+}
+
+/* ================= render ================= */
+function render(){
+  var app=document.getElementById("app"); var h="";
+  if(state.screen==="setup"){ h=viewSetup(); }
+  else if(state.loading){ h='<div class="mono" style="padding:40px;color:'+C.muted+'">syncing with your sheet…</div>'; }
+  else if(!state.config){ h='<div class="mono" style="padding:40px;color:'+C.muted+'">…</div>'; }
+  else if(state.screen==="home"){ h=viewHome(); }
+  else if(state.screen==="log"){ h=viewLog(); }
+  else if(state.screen==="sticking"){ h=viewSticking(); }
+  else if(state.screen==="edit"){ h=viewEdit(); }
+  else if(state.screen==="settings"){ h=viewSettings(); }
+  app.innerHTML=h;
+  bind();
+}
+function go(s){ state.screen=s; state.saved=false; render(); }
+
+/* ---------------- derived ---------------- */
+function loggedDates(){ return Object.keys(state.days).sort(); }
+function currentStreak(){ var d=loggedDates(); return d.length?state.days[d[d.length-1]].streak:0; }
+function bumpReady(){ var d=loggedDates(); if(d.length<7) return false; var last=d.slice(-7); var s=0; for(var i=0;i<7;i++) s+=state.days[last[i]].score; return (s/7)>=state.config.target+2; }
+function weekTotal(){ var wk=mondayOf(todayStr()); var d=loggedDates(); var t=0; for(var i=0;i<d.length;i++){ if(daysBetween(wk,d[i])>=0) t+=state.days[d[i]].score; } return t; }
+
+/* ---------------- views ---------------- */
+function viewSetup(){
+  return ''+
+  '<div class="eye">the nightly tally · one-time setup</div>'+
+  '<h1 class="disp">Connect your sheet</h1>'+
+  '<p style="color:'+C.muted+';font-size:14px;margin-top:8px">Paste the web-app link from your Google Apps Script deployment. It saves once, on this device.</p>'+
+  '<div class="card block" style="margin-top:16px">'+
+    '<div class="eye">apps script web-app url</div>'+
+    '<input id="urlIn" class="input" style="margin-top:8px" placeholder="https://script.google.com/macros/s/…/exec">'+
+    '<button class="primary tap" data-act="saveUrl" style="margin-top:12px">Connect →</button>'+
+  '</div>';
+}
+
+function viewHome(){
+  var cf=state.config, today=todayStr(), te=state.days[today];
+  var wt=weekTotal(), thr=cf.rewardThreshold, hit=wt>=thr;
+  var pct=Math.min(100,Math.round(wt/Math.max(1,thr)*100));
+  var h='';
+  if(state.error) h+='<div class="banner mono" style="background:rgba(206,131,117,.14);color:'+C.dust+'">'+esc(state.error)+'</div>';
+  h+='<div class="rowb"><span class="eye">the nightly tally</span><button class="tap mono eyebtn" data-act="refresh">↻ refresh</button></div>';
+  h+='<h1 class="disp">Good night.<br>Let’s count the day.</h1>';
+
+  h+='<div class="card block" style="margin-top:18px">'+
+    '<div class="rowb"><span class="eye">tonight</span><span class="mono" style="font-size:11px;color:'+(te?C.green:C.dust)+'">'+(te?"logged":"not logged")+'</span></div>'+
+    '<button class="primary tap" data-act="go-log" style="margin-top:12px">'+(te?"Edit today’s log":"Log tonight →")+'</button>'+
+    (te?('<div class="rowb" style="margin-top:12px"><span style="color:'+C.muted+';font-size:13px">Today’s score</span><span class="mono" style="font-size:22px;font-weight:700;color:'+(te.met?C.amber:C.text)+'">'+te.score+(te.met?' <span style="font-size:12px;color:'+C.amber+'">✓ target</span>':'')+'</span></div>'):'')+
+  '</div>';
+
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">'+
+    '<div class="card stat"><div class="eye">streak</div><div class="big">'+currentStreak()+'<span class="unit">days</span></div></div>'+
+    '<div class="card stat"><div class="eye">today’s target</div><div class="big">'+cf.target+'<span class="unit">pts</span></div></div>'+
+  '</div>';
+
+  if(bumpReady()){
+    h+='<div class="card block tap" style="margin-top:12px;border-color:rgba(235,176,74,.45);background:linear-gradient(180deg,#3a2f18,'+C.card+' 70%)" data-act="go-settings">'+
+      '<div class="eye" style="color:'+C.amber+'">you’ve earned it</div>'+
+      '<p style="font-size:13.5px;color:#D8CBB0;margin:6px 0 4px">You’ve been clearing '+cf.target+' comfortably. Raise the bar to '+(cf.target+1)+'? →</p>'+
+    '</div>';
+  }
+
+  h+='<div class="card block" style="margin-top:12px">'+
+    '<div class="rowb"><span class="eye">this week’s reward</span><span class="mono" style="font-size:11px;color:'+C.muted+'">'+wt+' / '+thr+'</span></div>'+
+    '<div class="bar"><div class="fill" style="width:'+pct+'%;background:'+(hit?C.amber:'linear-gradient(90deg,'+C.slate+','+C.amber+')')+'"></div></div>'+
+    '<p style="font-size:13px;color:'+(hit?C.amber:C.muted)+';margin-top:10px">'+
+      (cf.rewardLabel?(hit?('Unlocked — '+esc(cf.rewardLabel)+'. It’s earned.'):((thr-wt)+' pts to: '+esc(cf.rewardLabel))):'Set your reward in Settings.')+
+    '</p>'+
+  '</div>';
+
+  h+='<button class="export tap" data-act="export">⤓ export to excel</button>';
+  h+='<div class="nav">'+
+    '<button class="navb tap" data-act="go-sticking">What’s sticking</button>'+
+    '<button class="navb tap" data-act="go-edit">Edit list</button>'+
+    '<button class="navb tap" data-act="go-settings">Settings</button>'+
+  '</div>';
+  return h;
+}
+
+function viewLog(){
+  var cf=state.config, score=scoreDay(cf.items,state.draftVals), met=score>=cf.target;
+  if(state.saved){
+    return '<button class="tap mono eyebtn" data-act="go-home">← back</button>'+
+      '<div class="card block" style="margin-top:16px;text-align:center;padding:32px 20px">'+
+        '<div class="mono" style="font-size:44px;font-weight:700;color:'+(met?C.amber:C.text)+'">'+score+'</div>'+
+        '<div class="disp" style="font-size:18px;margin-top:6px">'+(met?"Target cleared.":"Logged.")+'</div>'+
+        '<p style="color:'+C.muted+';font-size:13.5px;margin-top:8px">'+(met?"Streak grows. Sleep well.":"A quiet day counts too.")+'</p>'+
+        '<button class="primary tap" data-act="go-home" style="margin-top:18px">Done →</button>'+
+      '</div>';
+  }
+  var h='<button class="tap mono eyebtn" data-act="go-home">← back</button>';
+  h+='<h1 class="disp" style="font-size:26px">Tonight’s tally</h1>';
+  h+='<p style="color:'+C.muted+';font-size:13.5px;margin-top:4px">What actually happened today. Answer once, honestly.</p>';
+  h+='<div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">';
+  for(var i=0;i<cf.items.length;i++){
+    var it=cf.items[i], v=state.draftVals[it.id]||0, on=(it.type==="binary"?!!v:v>0);
+    h+='<div class="card" style="padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-color:'+(on?"rgba(143,191,159,.35)":C.line)+'">'+
+      '<div><div style="font-size:14.5px;font-weight:500">'+esc(it.label)+'</div>'+
+      '<div class="mono" style="font-size:11px;color:'+C.faint+';margin-top:2px">+'+it.unit+(it.type==="count"?" each":"")+(it.max?" · max "+it.max:"")+'</div></div>';
+    if(it.type==="binary"){
+      h+='<button class="tap" data-act="toggle" data-id="'+it.id+'" style="width:64px;height:34px;border-radius:20px;border:1px solid '+(v?C.green:C.line)+';background:'+(v?"rgba(143,191,159,.18)":C.ink2)+';color:'+(v?C.green:C.faint)+';font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700">'+(v?"YES":"no")+'</button>';
+    } else {
+      h+='<div style="display:flex;align-items:center;border:1px solid '+C.line+';border-radius:20px;overflow:hidden">'+
+        '<button class="tap step" data-act="dec" data-id="'+it.id+'" style="border-radius:0">−</button>'+
+        '<span class="mono" style="width:30px;text-align:center;font-size:15px;font-weight:700;color:'+(v>0?C.green:C.faint)+'">'+v+'</span>'+
+        '<button class="tap step" data-act="inc" data-id="'+it.id+'" style="border-radius:0">+</button>'+
+      '</div>';
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+  if(!met){
+    h+='<div class="card block" style="margin-top:14px"><div class="eye">under target — one line</div>'+
+      '<input id="noteIn" class="input" style="margin-top:8px" placeholder="what got in the way?" value="'+esc(state.draftNote)+'"></div>';
+  }
+  h+='<div class="card block" style="margin-top:14px;position:sticky;bottom:10px">'+
+    '<div class="rowb"><span style="color:'+C.muted+';font-size:13px">Running score · target '+cf.target+'</span><span class="mono" style="font-size:24px;font-weight:700;color:'+(met?C.amber:C.text)+'">'+score+'</span></div>'+
+    '<button class="primary tap" data-act="saveDay" style="margin-top:12px">Save the day</button>'+
+  '</div>';
+  return h;
+}
+
+function viewSticking(){
+  var cf=state.config, d=loggedDates().slice(-30);
+  var rows=cf.items.map(function(it){
+    var done=0,sum=0;
+    for(var i=0;i<d.length;i++){ var v=state.days[d[i]].values[it.id]; if(it.type==="binary"?!!v:v>0) done++; sum+=Number(v||0); }
+    var rate=d.length?Math.round(done/d.length*100):0;
+    var avg=(it.type==="count"&&d.length)?(sum/d.length):null;
+    return {it:it,rate:rate,avg:avg};
+  }).sort(function(a,b){return b.rate-a.rate;});
+  var h='<button class="tap mono eyebtn" data-act="go-home">← back</button>';
+  h+='<h1 class="disp" style="font-size:26px">What’s sticking</h1>';
+  h+='<p style="color:'+C.muted+';font-size:13.5px;margin-top:4px">'+(d.length?("Last "+d.length+" logged "+(d.length===1?"day":"days")+". High = locked in; low = still needs the carrot."):"Log a few nights and your patterns show up here.")+'</p>';
+  h+='<div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">';
+  for(var i=0;i<rows.length;i++){ var r=rows[i], col=r.rate>=80?C.green:(r.rate>=40?C.amber:C.dust);
+    h+='<div class="card" style="padding:12px 14px"><div class="rowb"><span style="font-size:14px">'+esc(r.it.label)+'</span>'+
+      '<span class="mono" style="font-size:12px;color:'+col+'">'+(r.avg!=null?(r.avg.toFixed(1)+"/day"):(r.rate+"%"))+'</span></div>'+
+      '<div class="bar" style="height:6px"><div style="height:100%;border-radius:5px;width:'+r.rate+'%;background:'+col+'"></div></div></div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+function syncEditDom(){
+  if(!state.draftItems) return;
+  for(var i=0;i<state.draftItems.length;i++){
+    var lab=document.querySelector('[data-lab="'+i+'"]'); if(lab) state.draftItems[i].label=lab.value;
+    var pts=document.querySelector('[data-pts="'+i+'"]'); if(pts) state.draftItems[i].unit=Number(pts.value)||0;
+    var mx=document.querySelector('[data-max="'+i+'"]'); if(mx) state.draftItems[i].max=mx.value?Number(mx.value):null;
+  }
+}
+function viewEdit(){
+  if(!state.draftItems) state.draftItems=state.config.items.map(function(x){return Object.assign({},x);});
+  var h='<button class="tap mono eyebtn" data-act="go-home">← back</button>';
+  h+='<h1 class="disp" style="font-size:26px">Your list</h1>';
+  h+='<p style="color:'+C.muted+';font-size:13.5px;margin-top:4px">Add, drop, or re-price anything. Saved to your sheet, so both devices update.</p>';
+  h+='<div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">';
+  for(var i=0;i<state.draftItems.length;i++){ var it=state.draftItems[i];
+    h+='<div class="card" style="padding:12px 14px">'+
+      '<input class="input" style="margin-bottom:8px" data-lab="'+i+'" value="'+esc(it.label)+'">'+
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+        '<button class="tap mono" data-act="type-bin" data-idx="'+i+'" style="font-size:11px;padding:5px 10px;border-radius:16px;border:1px solid '+(it.type==="binary"?C.slate:C.line)+';color:'+(it.type==="binary"?C.slate:C.faint)+';background:'+(it.type==="binary"?"rgba(143,176,204,.14)":"transparent")+'">yes / no</button>'+
+        '<button class="tap mono" data-act="type-cnt" data-idx="'+i+'" style="font-size:11px;padding:5px 10px;border-radius:16px;border:1px solid '+(it.type==="count"?C.slate:C.line)+';color:'+(it.type==="count"?C.slate:C.faint)+';background:'+(it.type==="count"?"rgba(143,176,204,.14)":"transparent")+'">count</button>'+
+        '<span class="mono" style="font-size:11px;color:'+C.faint+'">pts</span>'+
+        '<input class="num" type="number" data-pts="'+i+'" value="'+it.unit+'">'+
+        (it.type==="count"?('<span class="mono" style="font-size:11px;color:'+C.faint+'">max</span><input class="num" type="number" data-max="'+i+'" placeholder="∞" value="'+(it.max||"")+'">'):'')+
+        '<button class="tap mono" data-act="del" data-idx="'+i+'" style="margin-left:auto;color:'+C.dust+';font-size:12px">remove</button>'+
+      '</div></div>';
+  }
+  h+='</div>';
+  h+='<button class="ghost tap" data-act="add">+ add a thing</button>';
+  h+='<button class="primary tap" data-act="saveList" style="margin-top:12px">Save list</button>';
+  return h;
+}
+
+function viewSettings(){
+  var cf=state.config;
+  var h='<button class="tap mono eyebtn" data-act="go-home">← back</button>';
+  h+='<h1 class="disp" style="font-size:26px">Settings</h1>';
+  h+='<div class="card block" style="margin-top:16px"><div class="eye">daily target</div>'+
+    '<p style="font-size:12.5px;color:'+C.muted+';margin:5px 0 10px">Start low; raise it when you’re clearing it easily.</p>'+
+    '<div style="display:flex;gap:8px;align-items:center">'+
+      '<button class="tap step" data-act="tgt-dn">−</button>'+
+      '<span class="mono" id="tgtVal" style="font-size:22px;font-weight:700;width:44px;text-align:center">'+cf.target+'</span>'+
+      '<button class="tap step" data-act="tgt-up">+</button>'+
+    '</div></div>';
+  h+='<div class="card block" style="margin-top:12px"><div class="eye">weekly reward</div>'+
+    '<p style="font-size:12.5px;color:'+C.muted+';margin:5px 0 10px">Cross this many points in a week (from Monday) and it unlocks.</p>'+
+    '<input id="rwLabel" class="input" placeholder="the reward you promise yourself" value="'+esc(cf.rewardLabel)+'">'+
+    '<div style="display:flex;gap:8px;align-items:center;margin-top:10px"><span class="mono" style="font-size:11px;color:'+C.faint+'">points needed</span>'+
+      '<input id="rwThr" class="num" type="number" value="'+cf.rewardThreshold+'"></div></div>';
+  h+='<div class="card block" style="margin-top:12px"><div class="eye">your google sheet link</div>'+
+    '<input id="urlIn2" class="input" style="margin-top:8px" value="'+esc(state.url||"")+'"></div>';
+  h+='<button class="primary tap" data-act="saveSettings" style="margin-top:14px">Save settings</button>';
+  return h;
+}
+
+/* ---------------- actions ---------------- */
+function saveToday(){
+  var cf=state.config, today=todayStr();
+  var score=scoreDay(cf.items,state.draftVals), met=score>=cf.target;
+  var dates=loggedDates().filter(function(d){return d<today;});
+  var prev=dates.length?state.days[dates[dates.length-1]]:null;
+  var prevStreak=prev?prev.streak:0, streak, usedGrace=false;
+  if(met) streak=prevStreak+1;
+  else if(graceAvailable(cf.graceUsedDates,today)){ streak=prevStreak; usedGrace=true; }
+  else streak=0;
+  var entry={values:Object.assign({},state.draftVals),score:score,met:met,targetAt:cf.target,streak:streak,note:met?"":state.draftNote};
+  state.days[today]=entry;
+  if(usedGrace){ cf.graceUsedDates.push(today); apiPost({action:"saveConfig",config:cf}); }
+  state.saved=true; render();
+  apiPost({action:"saveDay",date:today,entry:entry}).catch(function(){ state.error="Saved on screen but the sheet didn’t confirm — hit refresh."; });
+}
+function doExport(){
+  var cf=state.config, dates=loggedDates();
+  var rows=dates.map(function(d){ var e=state.days[d]; var r={Date:d};
+    cf.items.forEach(function(it){ r[it.label]=itemPoints(it,e.values[it.id]); });
+    r.Score=e.score; r.Target=e.targetAt; r["Hit target"]=e.met?"yes":"no"; r.Streak=e.streak; r["What got in the way"]=e.note||""; return r; });
+  if(!rows.length) rows.push({Date:"(no days logged yet)"});
+  var ws=XLSX.utils.json_to_sheet(rows), wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Daily tally");
+  XLSX.writeFile(wb,"nightly-tally-"+todayStr()+".xlsx");
+}
+
+/* ---------------- event binding ---------------- */
+function bind(){
+  var app=document.getElementById("app");
+  app.onclick=function(ev){
+    var t=ev.target.closest("[data-act]"); if(!t) return;
+    var a=t.getAttribute("data-act"), id=t.getAttribute("data-id"), idx=t.getAttribute("data-idx");
+    if(a==="saveUrl"){ var u=document.getElementById("urlIn").value.trim(); if(u){ localStorage.setItem("tally_url",u); state.url=u; state.screen="home"; load(); } return; }
+    if(a==="refresh"){ load(); return; }
+    if(a==="go-home") return go("home");
+    if(a==="go-log"){ var te=state.days[todayStr()]; state.draftVals=te?Object.assign({},te.values):{}; state.draftNote=te?(te.note||""):""; state.saved=false; return go("log"); }
+    if(a==="go-sticking") return go("sticking");
+    if(a==="go-edit"){ state.draftItems=null; return go("edit"); }
+    if(a==="go-settings") return go("settings");
+    if(a==="toggle"){ state.draftVals[id]=state.draftVals[id]?0:1; return render(); }
+    if(a==="inc"){ var it=findItem(id); var v=(state.draftVals[id]||0)+1; if(it&&it.max) v=Math.min(it.max,v); state.draftVals[id]=v; return render(); }
+    if(a==="dec"){ state.draftVals[id]=Math.max(0,(state.draftVals[id]||0)-1); return render(); }
+    if(a==="saveDay") return saveToday();
+    if(a==="export") return doExport();
+    if(a==="add"){ syncEditDom(); state.draftItems.push({id:"i"+Date.now(),label:"New thing",unit:1,type:"binary",max:null}); return render(); }
+    if(a==="del"){ syncEditDom(); state.draftItems.splice(Number(idx),1); return render(); }
+    if(a==="type-bin"){ syncEditDom(); state.draftItems[Number(idx)].type="binary"; return render(); }
+    if(a==="type-cnt"){ syncEditDom(); state.draftItems[Number(idx)].type="count"; return render(); }
+    if(a==="saveList"){ syncEditDom(); state.config.items=state.draftItems; apiPost({action:"saveConfig",config:state.config}); state.draftItems=null; return go("home"); }
+    if(a==="tgt-up"){ var el=document.getElementById("tgtVal"); el.textContent=Number(el.textContent)+1; return; }
+    if(a==="tgt-dn"){ var e2=document.getElementById("tgtVal"); e2.textContent=Math.max(1,Number(e2.textContent)-1); return; }
+    if(a==="saveSettings"){
+      state.config.target=Number(document.getElementById("tgtVal").textContent);
+      state.config.rewardLabel=document.getElementById("rwLabel").value;
+      state.config.rewardThreshold=Number(document.getElementById("rwThr").value)||0;
+      var nu=document.getElementById("urlIn2").value.trim();
+      if(nu&&nu!==state.url){ localStorage.setItem("tally_url",nu); state.url=nu; }
+      apiPost({action:"saveConfig",config:state.config});
+      return go("home");
+    }
+  };
+  var note=document.getElementById("noteIn"); if(note) note.oninput=function(){ state.draftNote=note.value; };
+}
+function findItem(id){ var it=state.config.items; for(var i=0;i<it.length;i++){ if(it[i].id===id) return it[i]; } return null; }
+
+init();
+</script>
+</body>
+</html>
