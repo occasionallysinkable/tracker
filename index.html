@@ -188,7 +188,7 @@ function viewHome(){
 }
 
 function viewLog(){
-  var cf=state.config, score=scoreDay(cf.items,state.draftVals), met=score>=cf.target;
+  var cf=state.config, ld=state.logDate||todayStr(), score=scoreDay(cf.items,state.draftVals), met=score>=cf.target;
   if(state.saved){
     return '<button class="tap mono eyebtn" data-act="go-home">← back</button>'+
       '<div class="card block" style="margin-top:16px;text-align:center;padding:32px 20px">'+
@@ -200,8 +200,10 @@ function viewLog(){
   }
   var h='<button class="tap mono eyebtn" data-act="go-home">← back</button>';
   h+='<h1 class="disp" style="font-size:26px">Tonight’s tally</h1>';
-  h+='<p style="color:'+C.muted+';font-size:13.5px;margin-top:4px">What actually happened today. Answer once, honestly.</p>';
-  h+='<div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">';
+  h+='<p style="color:'+C.muted+';font-size:13.5px;margin-top:4px">What actually happened. Answer once, honestly.</p>';
+  h+='<div class="card block" style="margin-top:14px"><div class="rowb"><span class="eye">logging for</span>'+
+    '<input id="dateIn" type="date" value="'+ld+'" max="'+todayStr()+'" style="background:'+C.ink2+';border:1px solid '+C.line+';border-radius:9px;padding:8px 10px;color:'+C.text+';font-size:13px;outline:none;font-family:\'JetBrains Mono\',monospace;color-scheme:dark"></div></div>';
+  h+='<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">';
   for(var i=0;i<cf.items.length;i++){
     var it=cf.items[i], v=state.draftVals[it.id]||0, on=(it.type==="binary"?!!v:v>0);
     h+='<div class="card" style="padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-color:'+(on?"rgba(143,191,159,.35)":C.line)+'">'+
@@ -307,8 +309,9 @@ function viewSettings(){
 }
 
 /* ---------------- actions ---------------- */
+function loadDraftFor(d){ var te=state.days[d]; state.draftVals=te?Object.assign({},te.values):{}; state.draftNote=te?(te.note||""):""; }
 function saveToday(){
-  var cf=state.config, today=todayStr();
+  var cf=state.config, today=state.logDate||todayStr();
   var score=scoreDay(cf.items,state.draftVals), met=score>=cf.target;
   var dates=loggedDates().filter(function(d){return d<today;});
   var prev=dates.length?state.days[dates[dates.length-1]]:null;
@@ -342,7 +345,7 @@ function bind(){
     if(a==="saveUrl"){ var u=document.getElementById("urlIn").value.trim(); if(u){ localStorage.setItem("tally_url",u); state.url=u; state.screen="home"; load(); } return; }
     if(a==="refresh"){ load(); return; }
     if(a==="go-home") return go("home");
-    if(a==="go-log"){ var te=state.days[todayStr()]; state.draftVals=te?Object.assign({},te.values):{}; state.draftNote=te?(te.note||""):""; state.saved=false; return go("log"); }
+    if(a==="go-log"){ state.logDate=todayStr(); loadDraftFor(state.logDate); state.saved=false; return go("log"); }
     if(a==="go-sticking") return go("sticking");
     if(a==="go-edit"){ state.draftItems=null; return go("edit"); }
     if(a==="go-settings") return go("settings");
@@ -369,6 +372,7 @@ function bind(){
     }
   };
   var note=document.getElementById("noteIn"); if(note) note.oninput=function(){ state.draftNote=note.value; };
+  var di=document.getElementById("dateIn"); if(di) di.onchange=function(){ state.logDate=di.value||todayStr(); loadDraftFor(state.logDate); render(); };
 }
 function findItem(id){ var it=state.config.items; for(var i=0;i<it.length;i++){ if(it[i].id===id) return it[i]; } return null; }
 
