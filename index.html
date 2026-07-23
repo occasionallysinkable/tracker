@@ -9,16 +9,23 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
-    --ink:#0E1119;--ink2:#141A27;--card:#1A2131;--line:#2A3346;
-    --text:#E9E7E1;--muted:#8B93A5;--faint:#5C6478;
-    --amber:#EBB04A;--green:#8FBF9F;--dust:#CE8375;--slate:#8FB0CC;
+    --ink:#262624;--ink2:#1E1E1C;--card:#30302E;--line:#454542;
+    --text:#F0EEE8;--muted:#A5A29A;--faint:#7C7970;
+    --amber:#E0A64A;--green:#8FBF9F;--dust:#CE8375;--slate:#9FB6C8;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   html{-webkit-text-size-adjust:100%;}
   body{background:var(--ink);color:var(--text);font-family:'Inter',system-ui,sans-serif;line-height:1.5;
-    background-image:radial-gradient(120% 55% at 50% -8%, rgba(235,176,74,.07), transparent 60%);
+    background-image:radial-gradient(120% 55% at 50% -8%, rgba(224,166,74,.05), transparent 60%);
     background-repeat:no-repeat;min-height:100vh;padding:22px 14px 48px;}
-  .wrap{max-width:460px;margin:0 auto;}
+  .wrap{max-width:960px;margin:0 auto;}
+  /* two-column grids that collapse on narrow screens */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .grid2 > .span2{grid-column:1 / -1;}
+  .items{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+  @media (max-width:640px){
+    .grid2,.items{grid-template-columns:1fr;}
+  }
   .mono{font-family:'JetBrains Mono',monospace;}
   .disp{font-family:'Space Grotesk',system-ui,sans-serif;}
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
@@ -54,7 +61,7 @@
 
 <script>
 /* ---------------- config + helpers ---------------- */
-var C = {ink:"#0E1119",ink2:"#141A27",card:"#1A2131",line:"#2A3346",text:"#E9E7E1",muted:"#8B93A5",faint:"#5C6478",amber:"#EBB04A",green:"#8FBF9F",dust:"#CE8375",slate:"#8FB0CC"};
+var C = {ink:"#262624",ink2:"#1E1E1C",card:"#30302E",line:"#454542",text:"#F0EEE8",muted:"#A5A29A",faint:"#7C7970",amber:"#E0A64A",green:"#8FBF9F",dust:"#CE8375",slate:"#9FB6C8"};
 
 var DEFAULT_ITEMS = [
   {id:"pray",   label:"Prayed",                       unit:1, type:"count",  max:5},
@@ -144,33 +151,37 @@ function viewSetup(){
 }
 
 function viewHome(){
-  var cf=state.config, today=todayStr(), te=state.days[today];
+  var cf=state.config, ld=state.logDate||todayStr(), te=state.days[ld];
+  var isToday=(ld===todayStr());
   var wt=weekTotal(), thr=cf.rewardThreshold, hit=wt>=thr;
   var pct=Math.min(100,Math.round(wt/Math.max(1,thr)*100));
   var h='';
   if(state.error) h+='<div class="banner mono" style="background:rgba(206,131,117,.14);color:'+C.dust+'">'+esc(state.error)+'</div>';
   h+='<div class="rowb"><span class="eye">the nightly tally</span><button class="tap mono eyebtn" data-act="refresh">↻ refresh</button></div>';
-  h+='<h1 class="disp">Good night.<br>Let’s count the day.</h1>';
+  h+='<h1 class="disp">Good night. Let’s count the day.</h1>';
 
-  h+='<div class="card block" style="margin-top:18px">'+
-    '<div class="rowb"><span class="eye">tonight</span><span class="mono" style="font-size:11px;color:'+(te?C.green:C.dust)+'">'+(te?"logged":"not logged")+'</span></div>'+
-    '<button class="primary tap" data-act="go-log" style="margin-top:12px">'+(te?"Edit today’s log":"Log tonight →")+'</button>'+
-    (te?('<div class="rowb" style="margin-top:12px"><span style="color:'+C.muted+';font-size:13px">Today’s score</span><span class="mono" style="font-size:22px;font-weight:700;color:'+(te.met?C.amber:C.text)+'">'+te.score+(te.met?' <span style="font-size:12px;color:'+C.amber+'">✓ target</span>':'')+'</span></div>'):'')+
+  h+='<div class="grid2" style="margin-top:18px">';
+
+  /* log card — spans both columns */
+  h+='<div class="card block span2">'+
+    '<div class="rowb" style="flex-wrap:wrap;gap:10px">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<span class="eye">logging for</span>'+
+        '<input id="homeDate" type="date" value="'+ld+'" max="'+todayStr()+'" style="background:'+C.ink2+';border:1px solid '+C.line+';border-radius:9px;padding:7px 10px;color:'+C.text+';font-size:13px;outline:none;font-family:\'JetBrains Mono\',monospace;color-scheme:dark">'+
+        (isToday?'':'<button class="tap mono" data-act="date-today" style="font-size:11px;color:'+C.slate+'">today</button>')+
+      '</div>'+
+      '<span class="mono" style="font-size:11px;color:'+(te?C.green:C.dust)+'">'+(te?"logged":"not logged")+'</span>'+
+    '</div>'+
+    '<button class="primary tap" data-act="go-log" style="margin-top:12px">'+(te?"Edit this day’s log":(isToday?"Log tonight →":"Log this day →"))+'</button>'+
+    (te?('<div class="rowb" style="margin-top:12px"><span style="color:'+C.muted+';font-size:13px">Score for this day</span><span class="mono" style="font-size:22px;font-weight:700;color:'+(te.met?C.amber:C.text)+'">'+te.score+(te.met?' <span style="font-size:12px;color:'+C.amber+'">✓ target</span>':'')+'</span></div>'):'')+
   '</div>';
 
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">'+
-    '<div class="card stat"><div class="eye">streak</div><div class="big">'+currentStreak()+'<span class="unit">days</span></div></div>'+
-    '<div class="card stat"><div class="eye">today’s target</div><div class="big">'+cf.target+'<span class="unit">pts</span></div></div>'+
-  '</div>';
+  /* stats side by side */
+  h+='<div class="card stat"><div class="eye">streak</div><div class="big">'+currentStreak()+'<span class="unit">days</span></div></div>';
+  h+='<div class="card stat"><div class="eye">today’s target</div><div class="big">'+cf.target+'<span class="unit">pts</span></div></div>';
 
-  if(bumpReady()){
-    h+='<div class="card block tap" style="margin-top:12px;border-color:rgba(235,176,74,.45);background:linear-gradient(180deg,#3a2f18,'+C.card+' 70%)" data-act="go-settings">'+
-      '<div class="eye" style="color:'+C.amber+'">you’ve earned it</div>'+
-      '<p style="font-size:13.5px;color:#D8CBB0;margin:6px 0 4px">You’ve been clearing '+cf.target+' comfortably. Raise the bar to '+(cf.target+1)+'? →</p>'+
-    '</div>';
-  }
-
-  h+='<div class="card block" style="margin-top:12px">'+
+  /* reward */
+  h+='<div class="card block">'+
     '<div class="rowb"><span class="eye">this week’s reward</span><span class="mono" style="font-size:11px;color:'+C.muted+'">'+wt+' / '+thr+'</span></div>'+
     '<div class="bar"><div class="fill" style="width:'+pct+'%;background:'+(hit?C.amber:'linear-gradient(90deg,'+C.slate+','+C.amber+')')+'"></div></div>'+
     '<p style="font-size:13px;color:'+(hit?C.amber:C.muted)+';margin-top:10px">'+
@@ -178,7 +189,21 @@ function viewHome(){
     '</p>'+
   '</div>';
 
-  h+='<button class="export tap" data-act="export">⤓ export to excel</button>';
+  /* bump prompt, or export in its place */
+  if(bumpReady()){
+    h+='<div class="card block tap" style="border-color:rgba(224,166,74,.45);background:linear-gradient(180deg,#3b3323,'+C.card+' 70%)" data-act="go-settings">'+
+      '<div class="eye" style="color:'+C.amber+'">you’ve earned it</div>'+
+      '<p style="font-size:13.5px;color:#DCD3C0;margin:6px 0 4px">You’ve been clearing '+cf.target+' comfortably. Raise the bar to '+(cf.target+1)+'? →</p>'+
+    '</div>';
+  } else {
+    h+='<div class="card block" style="display:flex;align-items:center">'+
+      '<button class="export tap" data-act="export" style="margin-top:0">⤓ export to excel</button></div>';
+  }
+
+  h+='</div>'; /* end grid */
+
+  if(bumpReady()) h+='<button class="export tap" data-act="export">⤓ export to excel</button>';
+
   h+='<div class="nav">'+
     '<button class="navb tap" data-act="go-sticking">What’s sticking</button>'+
     '<button class="navb tap" data-act="go-edit">Edit list</button>'+
@@ -203,7 +228,7 @@ function viewLog(){
   h+='<p style="color:'+C.muted+';font-size:13.5px;margin-top:4px">What actually happened. Answer once, honestly.</p>';
   h+='<div class="card block" style="margin-top:14px"><div class="rowb"><span class="eye">logging for</span>'+
     '<input id="dateIn" type="date" value="'+ld+'" max="'+todayStr()+'" style="background:'+C.ink2+';border:1px solid '+C.line+';border-radius:9px;padding:8px 10px;color:'+C.text+';font-size:13px;outline:none;font-family:\'JetBrains Mono\',monospace;color-scheme:dark"></div></div>';
-  h+='<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">';
+  h+='<div class="items">';
   for(var i=0;i<cf.items.length;i++){
     var it=cf.items[i], v=state.draftVals[it.id]||0, on=(it.type==="binary"?!!v:v>0);
     h+='<div class="card" style="padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-color:'+(on?"rgba(143,191,159,.35)":C.line)+'">'+
@@ -345,7 +370,8 @@ function bind(){
     if(a==="saveUrl"){ var u=document.getElementById("urlIn").value.trim(); if(u){ localStorage.setItem("tally_url",u); state.url=u; state.screen="home"; load(); } return; }
     if(a==="refresh"){ load(); return; }
     if(a==="go-home") return go("home");
-    if(a==="go-log"){ state.logDate=todayStr(); loadDraftFor(state.logDate); state.saved=false; return go("log"); }
+    if(a==="date-today"){ state.logDate=todayStr(); return render(); }
+    if(a==="go-log"){ if(!state.logDate) state.logDate=todayStr(); loadDraftFor(state.logDate); state.saved=false; return go("log"); }
     if(a==="go-sticking") return go("sticking");
     if(a==="go-edit"){ state.draftItems=null; return go("edit"); }
     if(a==="go-settings") return go("settings");
@@ -373,6 +399,7 @@ function bind(){
   };
   var note=document.getElementById("noteIn"); if(note) note.oninput=function(){ state.draftNote=note.value; };
   var di=document.getElementById("dateIn"); if(di) di.onchange=function(){ state.logDate=di.value||todayStr(); loadDraftFor(state.logDate); render(); };
+  var hd=document.getElementById("homeDate"); if(hd) hd.onchange=function(){ state.logDate=hd.value||todayStr(); render(); };
 }
 function findItem(id){ var it=state.config.items; for(var i=0;i<it.length;i++){ if(it[i].id===id) return it[i]; } return null; }
 
