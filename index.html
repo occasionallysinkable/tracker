@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>The Nightly Tally</title>
+<title>Day Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -24,7 +24,8 @@
   .grid2 > .span2{grid-column:1 / -1;}
   .items{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
   @media (max-width:640px){
-    .grid2,.items{grid-template-columns:1fr;}
+    .grid2{grid-template-columns:1fr;}
+    .items{grid-template-columns:1fr !important;}
   }
   .mono{font-family:'JetBrains Mono',monospace;}
   .disp{font-family:'Space Grotesk',system-ui,sans-serif;}
@@ -76,7 +77,7 @@ var DEFAULT_ITEMS = [
   {id:"network",label:"Networking message",           unit:2, type:"count",  max:null},
   {id:"extra",  label:"Went the extra mile at work",  unit:1, type:"binary"}
 ];
-function defaultConfig(){ return {items:DEFAULT_ITEMS.map(function(x){return Object.assign({},x);}), target:2, rewardThreshold:60, rewardLabel:"", graceUsedDates:[]}; }
+function defaultConfig(){ return {items:DEFAULT_ITEMS.map(function(x){return Object.assign({},x);}), target:2, rewardThreshold:60, rewardLabel:"", graceUsedDates:[], cols:2}; }
 
 function pad(n){ return (n<10?"0":"")+n; }
 function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
@@ -140,7 +141,7 @@ function weekTotal(){ var wk=mondayOf(todayStr()); var d=loggedDates(); var t=0;
 /* ---------------- views ---------------- */
 function viewSetup(){
   return ''+
-  '<div class="eye">the nightly tally · one-time setup</div>'+
+  '<div class="eye">day tracker · one-time setup</div>'+
   '<h1 class="disp">Connect your sheet</h1>'+
   '<p style="color:'+C.muted+';font-size:14px;margin-top:8px">Paste the web-app link from your Google Apps Script deployment. It saves once, on this device.</p>'+
   '<div class="card block" style="margin-top:16px">'+
@@ -157,7 +158,7 @@ function viewHome(){
   var pct=Math.min(100,Math.round(wt/Math.max(1,thr)*100));
   var h='';
   if(state.error) h+='<div class="banner mono" style="background:rgba(206,131,117,.14);color:'+C.dust+'">'+esc(state.error)+'</div>';
-  h+='<div class="rowb"><span class="eye">the nightly tally</span><button class="tap mono eyebtn" data-act="refresh">↻ refresh</button></div>';
+  h+='<div class="rowb"><span class="eye">day tracker</span><button class="tap mono eyebtn" data-act="refresh">↻ refresh</button></div>';
   h+='<h1 class="disp">Good night. Let’s count the day.</h1>';
 
   h+='<div class="grid2" style="margin-top:18px">';
@@ -172,7 +173,7 @@ function viewHome(){
       '</div>'+
       '<span class="mono" style="font-size:11px;color:'+(te?C.green:C.dust)+'">'+(te?"logged":"not logged")+'</span>'+
     '</div>'+
-    '<button class="primary tap" data-act="go-log" style="margin-top:12px">'+(te?"Edit this day’s log":(isToday?"Log tonight →":"Log this day →"))+'</button>'+
+    '<button class="primary tap" data-act="go-log" style="margin-top:12px">'+(te?"Edit this day’s log":(isToday?"Log today →":"Log this day →"))+'</button>'+
     (te?('<div class="rowb" style="margin-top:12px"><span style="color:'+C.muted+';font-size:13px">Score for this day</span><span class="mono" style="font-size:22px;font-weight:700;color:'+(te.met?C.amber:C.text)+'">'+te.score+(te.met?' <span style="font-size:12px;color:'+C.amber+'">✓ target</span>':'')+'</span></div>'):'')+
   '</div>';
 
@@ -213,7 +214,7 @@ function viewHome(){
 }
 
 function viewLog(){
-  var cf=state.config, ld=state.logDate||todayStr(), score=scoreDay(cf.items,state.draftVals), met=score>=cf.target;
+  var cf=state.config, score=scoreDay(cf.items,state.draftVals), met=score>=cf.target;
   if(state.saved){
     return '<button class="tap mono eyebtn" data-act="go-home">← back</button>'+
       '<div class="card block" style="margin-top:16px;text-align:center;padding:32px 20px">'+
@@ -224,11 +225,9 @@ function viewLog(){
       '</div>';
   }
   var h='<button class="tap mono eyebtn" data-act="go-home">← back</button>';
-  h+='<h1 class="disp" style="font-size:26px">Tonight’s tally</h1>';
+  h+='<h1 class="disp" style="font-size:26px">Day Tracker</h1>';
   h+='<p style="color:'+C.muted+';font-size:13.5px;margin-top:4px">What actually happened. Answer once, honestly.</p>';
-  h+='<div class="card block" style="margin-top:14px"><div class="rowb"><span class="eye">logging for</span>'+
-    '<input id="dateIn" type="date" value="'+ld+'" max="'+todayStr()+'" style="background:'+C.ink2+';border:1px solid '+C.line+';border-radius:9px;padding:8px 10px;color:'+C.text+';font-size:13px;outline:none;font-family:\'JetBrains Mono\',monospace;color-scheme:dark"></div></div>';
-  h+='<div class="items">';
+  h+='<div class="items" style="grid-template-columns:repeat('+(cf.cols||2)+',minmax(0,1fr))">';
   for(var i=0;i<cf.items.length;i++){
     var it=cf.items[i], v=state.draftVals[it.id]||0, on=(it.type==="binary"?!!v:v>0);
     h+='<div class="card" style="padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-color:'+(on?"rgba(143,191,159,.35)":C.line)+'">'+
@@ -322,6 +321,13 @@ function viewSettings(){
       '<span class="mono" id="tgtVal" style="font-size:22px;font-weight:700;width:44px;text-align:center">'+cf.target+'</span>'+
       '<button class="tap step" data-act="tgt-up">+</button>'+
     '</div></div>';
+  h+='<div class="card block" style="margin-top:12px"><div class="eye">cards per row</div>'+
+    '<p style="font-size:12.5px;color:'+C.muted+';margin:5px 0 10px">How many items sit side by side on the log screen.</p>'+
+    '<div style="display:flex;gap:8px;align-items:center">'+
+      '<button class="tap step" data-act="cols-dn">−</button>'+
+      '<span class="mono" id="colsVal" style="font-size:22px;font-weight:700;width:44px;text-align:center">'+(cf.cols||2)+'</span>'+
+      '<button class="tap step" data-act="cols-up">+</button>'+
+    '</div></div>';
   h+='<div class="card block" style="margin-top:12px"><div class="eye">weekly reward</div>'+
     '<p style="font-size:12.5px;color:'+C.muted+';margin:5px 0 10px">Cross this many points in a week (from Monday) and it unlocks.</p>'+
     '<input id="rwLabel" class="input" placeholder="the reward you promise yourself" value="'+esc(cf.rewardLabel)+'">'+
@@ -357,8 +363,8 @@ function doExport(){
     r.Score=e.score; r.Target=e.targetAt; r["Hit target"]=e.met?"yes":"no"; r.Streak=e.streak; r["What got in the way"]=e.note||""; return r; });
   if(!rows.length) rows.push({Date:"(no days logged yet)"});
   var ws=XLSX.utils.json_to_sheet(rows), wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,"Daily tally");
-  XLSX.writeFile(wb,"nightly-tally-"+todayStr()+".xlsx");
+  XLSX.utils.book_append_sheet(wb,ws,"Day Tracker");
+  XLSX.writeFile(wb,"day-tracker-"+todayStr()+".xlsx");
 }
 
 /* ---------------- event binding ---------------- */
@@ -387,8 +393,11 @@ function bind(){
     if(a==="saveList"){ syncEditDom(); state.config.items=state.draftItems; apiPost({action:"saveConfig",config:state.config}); state.draftItems=null; return go("home"); }
     if(a==="tgt-up"){ var el=document.getElementById("tgtVal"); el.textContent=Number(el.textContent)+1; return; }
     if(a==="tgt-dn"){ var e2=document.getElementById("tgtVal"); e2.textContent=Math.max(1,Number(e2.textContent)-1); return; }
+    if(a==="cols-up"){ var cu=document.getElementById("colsVal"); cu.textContent=Math.min(6,Number(cu.textContent)+1); return; }
+    if(a==="cols-dn"){ var cd=document.getElementById("colsVal"); cd.textContent=Math.max(1,Number(cd.textContent)-1); return; }
     if(a==="saveSettings"){
       state.config.target=Number(document.getElementById("tgtVal").textContent);
+      state.config.cols=Number(document.getElementById("colsVal").textContent)||2;
       state.config.rewardLabel=document.getElementById("rwLabel").value;
       state.config.rewardThreshold=Number(document.getElementById("rwThr").value)||0;
       var nu=document.getElementById("urlIn2").value.trim();
@@ -398,7 +407,6 @@ function bind(){
     }
   };
   var note=document.getElementById("noteIn"); if(note) note.oninput=function(){ state.draftNote=note.value; };
-  var di=document.getElementById("dateIn"); if(di) di.onchange=function(){ state.logDate=di.value||todayStr(); loadDraftFor(state.logDate); render(); };
   var hd=document.getElementById("homeDate"); if(hd) hd.onchange=function(){ state.logDate=hd.value||todayStr(); render(); };
 }
 function findItem(id){ var it=state.config.items; for(var i=0;i<it.length;i++){ if(it[i].id===id) return it[i]; } return null; }

@@ -1,4 +1,4 @@
-# The Nightly Tally — project brief
+# Day Tracker — project brief
 
 A personal daily habit/points tracker. Self-hosted, no paid dependencies.
 
